@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  gpon-worker:
+    build: .
+    image: telecom/gpon-sync:v1
+    container_name: gpon_sync_worker
+    restart: unless-stopped  # Si el proceso falla, Docker lo reinicia automáticamente
+    env_file:
+      - .env
+    environment:
+      - TZ=America/Bogota  # O tu zona horaria local
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Si la base de datos también está en docker, descomentar esto:
+    # networks:
+    #   - internal-net
+
+# networks:
+#   internal-net:
+#     external: true
