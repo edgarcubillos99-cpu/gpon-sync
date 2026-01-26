@@ -1,10 +1,10 @@
 package main
 
 import (
-	"gpon-sync/config"
 	"gpon-sync/internal/adapters/notion"
 	"gpon-sync/internal/adapters/postgres"
 	"gpon-sync/internal/adapters/zabbix"
+	"gpon-sync/internal/config"
 	"gpon-sync/internal/core"
 	"log"
 )
