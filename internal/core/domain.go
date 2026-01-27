@@ -1,10 +1,12 @@
+// aqui estamos definiendo las entidades y las interfaces
 package core
 
 type Circuit struct {
 	ID           int
 	CircuitID    string // Identificador único (ej. "CIR-100")
 	OLT_Hostname string // Necesario para buscar en Zabbix
-	NotionPageID string // Si ya lo tienes, ayuda. Si no, buscaremos por query.
+	PonPort      string // Ej: "1" o "2"
+	OnuIndex     string // Ej: "51", "52", "1"
 }
 
 type EnrichedData struct {

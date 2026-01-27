@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// 1. Configuración
-	cfg := config.Load() // Asumimos que carga de .env
+	cfg := config.Load() // Carga las variables de entorno
 
 	// 2. Adaptadores
 	dbRepo, err := postgres.NewPostgresRepo(cfg.DatabaseURL)
@@ -23,8 +23,7 @@ func main() {
 	zabbixClient := zabbix.NewZabbixAdapter(cfg.ZabbixURL, cfg.ZabbixUser, cfg.ZabbixPass)
 
 	// 3. Core
-	// 🚧 INFO: Ajustar workerCount según capacidad del servidor (ej. 10)
-	pool := core.NewWorkerPool(10, notionClient, zabbixClient)
+	pool := core.NewWorkerPool(cfg.WorkerCount, notionClient, zabbixClient)
 
 	// 4. Ejecución
 	log.Println("Obteniendo circuitos...")

@@ -3,6 +3,8 @@ package zabbix
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -11,7 +13,7 @@ type ZabbixAdapter struct {
 	url      string
 	user     string
 	password string
-	token    string // Cacheamos el token de auth
+	token    string
 	client   *http.Client
 }
 
@@ -20,10 +22,11 @@ func NewZabbixAdapter(url, user, pass string) *ZabbixAdapter {
 		url:      url,
 		user:     user,
 		password: pass,
-		client:   &http.Client{Timeout: 5 * time.Second},
+		client:   &http.Client{Timeout: 10 * time.Second}, // Timeout más generoso para Zabbix
 	}
 }
 
+// Estructuras para Request/Response JSON-RPC 2.0
 type zabbixRequest struct {
 	Jsonrpc string      `json:"jsonrpc"`
 	Method  string      `json:"method"`
@@ -33,34 +36,72 @@ type zabbixRequest struct {
 }
 
 type zabbixResponse struct {
-	Result interface{} `json:"result"`
-	Error  interface{} `json:"error"`
+	Result json.RawMessage `json:"result"` // Usamos RawMessage para diferir el decode
+	Error  *zabbixError    `json:"error,omitempty"`
 }
 
+type zabbixError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    string `json:"data"`
+}
+
+// Estructura para leer el Token de auth
+type authResult string
+
+// Estructura para leer los Items
+type zabbixItem struct {
+	ItemID    string `json:"itemid"`
+	Name      string `json:"name"`
+	Key       string `json:"key_"`      // Ej: "rx power:1/1"
+	LastValue string `json:"lastvalue"` // Ej: "-26.7"
+}
+
+// Authenticate: Realiza el login y guarda el token
 func (z *ZabbixAdapter) Authenticate() error {
-	// Lógica de login para obtener el Auth Token
-	// Omito detalles standard de "user.login" para ahorrar espacio,
-	// pero aquí debes hacer POST method: "user.login" y guardar el result en z.token
-	// ...
-	z.token = "auth_token_simulado_por_brevedad_implementar_real"
+	body := zabbixRequest{
+		Jsonrpc: "2.0",
+		Method:  "user.login",
+		Params: map[string]string{
+			"user":     z.user,
+			"password": z.password,
+		},
+		ID: 1,
+	}
+
+	respBytes, err := z.doRequest(body)
+	if err != nil {
+		return err
+	}
+
+	// Parseamos el resultado que es un string simple (el token)
+	var token string
+	if err := json.Unmarshal(respBytes, &token); err != nil {
+		return fmt.Errorf("fallo al parsear token: %v", err)
+	}
+
+	z.token = token
 	return nil
 }
 
-func (z *ZabbixAdapter) GetOpticalInfo(oltHost, circuitID string) (string, string, error) {
+// GetOpticalInfo construye la key exacta basada en puerto e indice
+func (z *ZabbixAdapter) GetOpticalInfo(oltHost, port, index string) (string, string, error) {
 	if z.token == "" {
-		z.Authenticate()
+		if err := z.Authenticate(); err != nil {
+			return "", "", fmt.Errorf("auth error: %w", err)
+		}
 	}
 
-	// 🚧 NECESITO INFO: ¿Cómo identificas el item en Zabbix?
-	// Opción A: Buscas por "key_" que contenga el circuitID?
-	// Opción B: Buscas por "host" (OLT) y luego filtras items?
+	// 1. CONSTRUCCIÓN DE LA KEY EXACTA
+	// Según tu imagen 4: "rx power:1/51"
+	targetKey := fmt.Sprintf("rx power:%s/%s", port, index)
 
-	// Ejemplo: Buscamos items específicos de esa OLT que coincidan con la Key del circuito
 	params := map[string]interface{}{
 		"output": []string{"lastvalue", "key_"},
 		"host":   oltHost,
-		"search": map[string]string{
-			"key_": circuitID, // Asumiendo que la Key del item contiene el ID del circuito
+		// Buscamos EXACTAMENTE esa key, es mucho más rápido que usar 'search'
+		"filter": map[string]string{
+			"key_": targetKey,
 		},
 	}
 
@@ -68,20 +109,60 @@ func (z *ZabbixAdapter) GetOpticalInfo(oltHost, circuitID string) (string, strin
 		Jsonrpc: "2.0",
 		Method:  "item.get",
 		Params:  params,
-		ID:      1,
+		ID:      2,
 		Auth:    z.token,
 	}
 
-	jsonData, _ := json.Marshal(reqBody)
-	resp, err := z.client.Post(z.url, "application/json-rpc", bytes.NewBuffer(jsonData))
+	resultBytes, err := z.doRequest(reqBody)
 	if err != nil {
 		return "", "", err
 	}
+
+	var items []zabbixItem
+	if err := json.Unmarshal(resultBytes, &items); err != nil {
+		return "", "", fmt.Errorf("error parseando: %v", err)
+	}
+
+	if len(items) == 0 {
+		return "Unknown", "N/A", fmt.Errorf("item no encontrado: %s", targetKey)
+	}
+
+	// 2. INTERPRETACIÓN DE DATOS (Lógica de Negocio)
+	rawValue := items[0].LastValue
+	rxPower := rawValue + " dBm"
+	status := "Online"
+
+	// Lógica basada en tu imagen 3: Si RxPower es "0", el cliente está caído.
+	if rawValue == "0" || rawValue == "0.00" {
+		status = "Offline"
+		rxPower = "Sin Señal" // O mantener "0 dBm"
+	} else {
+		// Opcional: Validar niveles críticos (ej: menor a -27)
+		// if val < -27 { status = "Critical" }
+	}
+
+	return status, rxPower, nil
+}
+
+// doRequest: Helper privado para hacer la llamada HTTP y manejar errores de Zabbix
+func (z *ZabbixAdapter) doRequest(reqBody zabbixRequest) ([]byte, error) {
+	jsonData, _ := json.Marshal(reqBody)
+	resp, err := z.client.Post(z.url, "application/json-rpc", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 
-	// Parsear respuesta...
-	// Aquí debes iterar sobre los items retornados y extraer RxPower y Status.
-	// Depende mucho de cómo se llamen tus items (ej: "pon.rx_power[CIR-100]")
+	bodyBytes, _ := io.ReadAll(resp.Body)
 
-	return "Up", "-18dBm", nil
+	var zResp zabbixResponse
+	if err := json.Unmarshal(bodyBytes, &zResp); err != nil {
+		return nil, err
+	}
+
+	if zResp.Error != nil {
+		return nil, fmt.Errorf("zabbix api error %d: %s", zResp.Error.Code, zResp.Error.Message)
+	}
+
+	return zResp.Result, nil
 }

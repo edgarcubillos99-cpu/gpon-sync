@@ -35,6 +35,7 @@ type notionQueryResp struct {
 	} `json:"results"`
 }
 
+// GetCredentials: Obtiene las credenciales del circuito
 func (n *NotionAdapter) GetCredentials(circuitID string) (string, string, string, error) {
 	url := fmt.Sprintf("https://api.notion.com/v1/databases/%s/query", n.databaseID)
 

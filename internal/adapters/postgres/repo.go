@@ -1,3 +1,4 @@
+// aqui estamos implementando la interfaz de CircuitRepository
 package postgres
 
 import (
@@ -11,6 +12,7 @@ type PostgresRepo struct {
 	db *sql.DB
 }
 
+// NewPostgresRepo: Crea una nueva instancia de PostgresRepo
 func NewPostgresRepo(connStr string) (*PostgresRepo, error) {
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -22,6 +24,7 @@ func NewPostgresRepo(connStr string) (*PostgresRepo, error) {
 	return &PostgresRepo{db: db}, nil
 }
 
+// FetchPendingCircuits: Obtiene los circuitos pendientes de sincronización
 func (r *PostgresRepo) FetchPendingCircuits() ([]core.Circuit, error) {
 	// 🚧 NECESITO INFO: Nombre real de tu tabla y columnas
 	query := `SELECT id, circuit_code, olt_host FROM circuits_table WHERE status = 'active'`
@@ -43,6 +46,7 @@ func (r *PostgresRepo) FetchPendingCircuits() ([]core.Circuit, error) {
 	return circuits, nil
 }
 
+// UpdateCircuitBatch: Actualiza un batch de circuitos en la base de datos
 func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
 	// Implementación básica. Para producción masiva, usar COPY o transacciones por bloques.
 	tx, err := r.db.Begin()

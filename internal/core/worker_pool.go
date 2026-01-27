@@ -1,3 +1,4 @@
+// aqui implementamos la logica del worker pool
 package core
 
 import (
@@ -42,6 +43,7 @@ func (wp *WorkerPool) Run(circuits []Circuit) <-chan EnrichedData {
 	return results
 }
 
+// worker: Procesa un circuito por vez, comenzando con los datos de Notion y luego Zabbix
 func (wp *WorkerPool) worker(id int, jobs <-chan Circuit, results chan<- EnrichedData, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for c := range jobs {
@@ -59,17 +61,16 @@ func (wp *WorkerPool) worker(id int, jobs <-chan Circuit, results chan<- Enriche
 		data.PPPoEPass = pass
 
 		// 2. Zabbix
-		status, rx, err := wp.zabbix.GetOpticalInfo(c.OLT_Hostname, c.CircuitID)
+		status, rx, err := wp.zabbix.GetOpticalInfo(c.OLT_Hostname, c.PonPort, c.OnuIndex)
+
 		if err != nil {
-			// Nota: A veces quieres guardar los datos de Notion aunque falle Zabbix.
-			// Si es así, elimina el 'continue' y maneja el error parcial.
-			data.Error = fmt.Errorf("zabbix: %w", err)
+			data.Error = fmt.Errorf("zabbix err en %s/%s: %v", c.PonPort, c.OnuIndex, err)
 			results <- data
 			continue
 		}
+
 		data.StatusGpon = status
 		data.RxPower = rx
-
 		results <- data
 	}
 }

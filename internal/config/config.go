@@ -29,7 +29,7 @@ type Config struct {
 
 // Load lee el archivo .env y las variables de entorno del sistema
 func Load() *Config {
-	// 1. Intentamos cargar el archivo .env (útil para desarrollo local)
+	// 1. Intentamos cargar el archivo .env
 	// Si no existe (producción con Docker envs), no pasa nada.
 	_ = godotenv.Load()
 
