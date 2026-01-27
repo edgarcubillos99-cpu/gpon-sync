@@ -22,7 +22,7 @@ func NewZabbixAdapter(url, user, pass string) *ZabbixAdapter {
 		url:      url,
 		user:     user,
 		password: pass,
-		client:   &http.Client{Timeout: 10 * time.Second}, // Timeout más generoso para Zabbix
+		client:   &http.Client{Timeout: 10 * time.Second}, // Timeout para Zabbix
 	}
 }
 
@@ -93,7 +93,6 @@ func (z *ZabbixAdapter) GetOpticalInfo(oltHost, port, index string) (string, str
 	}
 
 	// 1. CONSTRUCCIÓN DE LA KEY EXACTA
-	// Según tu imagen 4: "rx power:1/51"
 	targetKey := fmt.Sprintf("rx power:%s/%s", port, index)
 
 	params := map[string]interface{}{
@@ -132,13 +131,11 @@ func (z *ZabbixAdapter) GetOpticalInfo(oltHost, port, index string) (string, str
 	rxPower := rawValue + " dBm"
 	status := "Online"
 
-	// Lógica basada en tu imagen 3: Si RxPower es "0", el cliente está caído.
+	// Si RxPower es "0", el cliente está caído.
 	if rawValue == "0" || rawValue == "0.00" {
 		status = "Offline"
 		rxPower = "Sin Señal" // O mantener "0 dBm"
 	} else {
-		// Opcional: Validar niveles críticos (ej: menor a -27)
-		// if val < -27 { status = "Critical" }
 	}
 
 	return status, rxPower, nil

@@ -75,7 +75,7 @@ func (n *NotionAdapter) GetCredentials(circuitID string) (string, string, string
 		return "", "", "", fmt.Errorf("circuit not found in notion")
 	}
 
-	props := result.Results[0].Properties
+	// props := result.Results[0].Properties
 
 	// 🚧 NECESITO INFO: Nombres exactos de las propiedades (columnas) en Notion
 	// Notion devuelve estructuras anidadas complejas. Aquí asumo que son texto simple.

@@ -30,5 +30,5 @@ type NotionClient interface {
 }
 
 type ZabbixClient interface {
-	GetOpticalInfo(oltHost, circuitID string) (status, rx string, err error)
+	GetOpticalInfo(oltHost, port, index string) (status, rx string, err error)
 }

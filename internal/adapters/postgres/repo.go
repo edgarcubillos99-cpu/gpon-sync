@@ -26,7 +26,7 @@ func NewPostgresRepo(connStr string) (*PostgresRepo, error) {
 
 // FetchPendingCircuits: Obtiene los circuitos pendientes de sincronización
 func (r *PostgresRepo) FetchPendingCircuits() ([]core.Circuit, error) {
-	// 🚧 NECESITO INFO: Nombre real de tu tabla y columnas
+	// 🚧 NECESITO INFO: Nombre real de la tabla y columnas
 	query := `SELECT id, circuit_code, olt_host FROM circuits_table WHERE status = 'active'`
 
 	rows, err := r.db.Query(query)
@@ -56,8 +56,8 @@ func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
 
 	// 🚧 NECESITO INFO: Nombres de columnas destino
 	stmt, err := tx.Prepare(`
-		UPDATE circuits_table 
-		SET vlan=$1, pppoe_user=$2, pppoe_pass=$3, gpon_status=$4, rx_power=$5, last_updated=NOW() 
+		UPDATE circuits_table
+		SET vlan=$1, pppoe_user=$2, pppoe_pass=$3, gpon_status=$4, rx_power=$5, last_updated=NOW()
 		WHERE circuit_code=$6
 	`)
 	if err != nil {

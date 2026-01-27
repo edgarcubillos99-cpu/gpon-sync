@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// 1. Configuración
-	cfg := config.Load() // Carga las variables de entorno
+	cfg := config.Load() // Asumimos que carga de .env
 
 	// 2. Adaptadores
 	dbRepo, err := postgres.NewPostgresRepo(cfg.DatabaseURL)
