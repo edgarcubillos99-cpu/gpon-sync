@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -46,9 +47,6 @@ type zabbixError struct {
 	Data    string `json:"data"`
 }
 
-// Estructura para leer el Token de auth
-type authResult string
-
 // Estructura para leer los Items
 type zabbixItem struct {
 	ItemID    string `json:"itemid"`
@@ -85,22 +83,25 @@ func (z *ZabbixAdapter) Authenticate() error {
 }
 
 // GetOpticalInfo construye la key exacta basada en puerto e indice
-func (z *ZabbixAdapter) GetOpticalInfo(oltHost, port, index string) (string, string, error) {
-	if z.token == "" {
-		if err := z.Authenticate(); err != nil {
-			return "", "", fmt.Errorf("auth error: %w", err)
-		}
+func (z *ZabbixAdapter) GetOpticalInfo(oltHost, ontID string) (string, string, error) {
+	// 1. LÓGICA DE PARSEO: 1/2/3 -> [1, 2, 3]
+	parts := strings.Split(ontID, "/")
+	if len(parts) < 3 {
+		return "", "", fmt.Errorf("formato ONT ID inválido: %s", ontID)
 	}
 
-	// 1. CONSTRUCCIÓN DE LA KEY EXACTA
-	targetKey := fmt.Sprintf("rx power:%s/%s", port, index)
+	segundo := parts[1] // El "2" para el status
+	tercero := parts[2] // El "3" para la potencia
+
+	// 🚧 KEYS SEGÚN TU REQUERIMIENTO:
+	powerKey := fmt.Sprintf("rx power:%s/%s", segundo, tercero)
+	statusKey := fmt.Sprintf("status_gpon_%s", segundo)
 
 	params := map[string]interface{}{
 		"output": []string{"lastvalue", "key_"},
 		"host":   oltHost,
-		// Buscamos EXACTAMENTE esa key, es mucho más rápido que usar 'search'
-		"filter": map[string]string{
-			"key_": targetKey,
+		"filter": map[string]interface{}{
+			"key_": []string{powerKey, statusKey},
 		},
 	}
 
@@ -118,27 +119,19 @@ func (z *ZabbixAdapter) GetOpticalInfo(oltHost, port, index string) (string, str
 	}
 
 	var items []zabbixItem
-	if err := json.Unmarshal(resultBytes, &items); err != nil {
-		return "", "", fmt.Errorf("error parseando: %v", err)
+	json.Unmarshal(resultBytes, &items)
+
+	var rx, status string
+	for _, item := range items {
+		if item.Key == powerKey {
+			rx = item.LastValue + " dBm"
+		}
+		if item.Key == statusKey {
+			status = item.LastValue // Ej: "1" o "Up"
+		}
 	}
 
-	if len(items) == 0 {
-		return "Unknown", "N/A", fmt.Errorf("item no encontrado: %s", targetKey)
-	}
-
-	// 2. INTERPRETACIÓN DE DATOS (Lógica de Negocio)
-	rawValue := items[0].LastValue
-	rxPower := rawValue + " dBm"
-	status := "Online"
-
-	// Si RxPower es "0", el cliente está caído.
-	if rawValue == "0" || rawValue == "0.00" {
-		status = "Offline"
-		rxPower = "Sin Señal" // O mantener "0 dBm"
-	} else {
-	}
-
-	return status, rxPower, nil
+	return status, rx, nil
 }
 
 // doRequest: Helper privado para hacer la llamada HTTP y manejar errores de Zabbix

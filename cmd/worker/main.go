@@ -3,6 +3,7 @@ package main
 import (
 	"gpon-sync/internal/adapters/notion"
 	"gpon-sync/internal/adapters/postgres"
+	"gpon-sync/internal/adapters/ubersmith"
 	"gpon-sync/internal/adapters/zabbix"
 	"gpon-sync/internal/config"
 	"gpon-sync/internal/core"
@@ -21,9 +22,10 @@ func main() {
 
 	notionClient := notion.NewNotionAdapter(cfg.NotionKey, cfg.NotionDBID)
 	zabbixClient := zabbix.NewZabbixAdapter(cfg.ZabbixURL, cfg.ZabbixUser, cfg.ZabbixPass)
+	ubersmithClient := ubersmith.NewUbersmithAdapter(cfg.UbersmithURL, cfg.UbersmithUser, cfg.UbersmithPass)
 
 	// 3. Core
-	pool := core.NewWorkerPool(cfg.WorkerCount, notionClient, zabbixClient)
+	pool := core.NewWorkerPool(cfg.WorkerCount, notionClient, zabbixClient, ubersmithClient)
 
 	// 4. Ejecución
 	log.Println("Obteniendo circuitos...")

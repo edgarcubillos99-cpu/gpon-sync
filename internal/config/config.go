@@ -23,6 +23,11 @@ type Config struct {
 	ZabbixUser string
 	ZabbixPass string
 
+	// Ubersmith
+	UbersmithURL  string
+	UbersmithUser string
+	UbersmithPass string
+
 	// Configuración del Worker
 	WorkerCount int
 }
@@ -58,13 +63,16 @@ func Load() *Config {
 
 	// 4. Retornar Configuración Validada
 	return &Config{
-		DatabaseURL: databaseURL,
-		NotionKey:   getEnvRequired("NOTION_API_KEY"),
-		NotionDBID:  getEnvRequired("NOTION_DATABASE_ID"),
-		ZabbixURL:   getEnvRequired("ZABBIX_URL"),
-		ZabbixUser:  getEnvRequired("ZABBIX_USER"),
-		ZabbixPass:  getEnvRequired("ZABBIX_PASS"),
-		WorkerCount: workers,
+		DatabaseURL:   databaseURL,
+		NotionKey:     getEnvRequired("NOTION_API_KEY"),
+		NotionDBID:    getEnvRequired("NOTION_DATABASE_ID"),
+		ZabbixURL:     getEnvRequired("ZABBIX_URL"),
+		ZabbixUser:    getEnvRequired("ZABBIX_USER"),
+		ZabbixPass:    getEnvRequired("ZABBIX_PASS"),
+		UbersmithURL:  getEnvRequired("UBERSMITH_URL"),
+		UbersmithUser: getEnvRequired("UBERSMITH_USER"),
+		UbersmithPass: getEnvRequired("UBERSMITH_PASS"),
+		WorkerCount:   workers,
 	}
 }
 

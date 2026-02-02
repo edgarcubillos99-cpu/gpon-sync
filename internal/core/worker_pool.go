@@ -2,7 +2,6 @@
 package core
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -10,13 +9,15 @@ type WorkerPool struct {
 	workerCount int
 	notion      NotionClient
 	zabbix      ZabbixClient
+	ubersmith   UbersmithClient
 }
 
-func NewWorkerPool(count int, n NotionClient, z ZabbixClient) *WorkerPool {
+func NewWorkerPool(count int, n NotionClient, z ZabbixClient, u UbersmithClient) *WorkerPool {
 	return &WorkerPool{
 		workerCount: count,
 		notion:      n,
 		zabbix:      z,
+		ubersmith:   u,
 	}
 }
 
@@ -32,7 +33,7 @@ func (wp *WorkerPool) Run(circuits []Circuit) <-chan EnrichedData {
 	var wg sync.WaitGroup
 	for i := 0; i < wp.workerCount; i++ {
 		wg.Add(1)
-		go wp.worker(i, jobs, results, &wg)
+		go wp.worker(jobs, results, &wg)
 	}
 
 	go func() {
@@ -44,33 +45,29 @@ func (wp *WorkerPool) Run(circuits []Circuit) <-chan EnrichedData {
 }
 
 // worker: Procesa un circuito por vez, comenzando con los datos de Notion y luego Zabbix
-func (wp *WorkerPool) worker(id int, jobs <-chan Circuit, results chan<- EnrichedData, wg *sync.WaitGroup) {
+func (wp *WorkerPool) worker(jobs <-chan Circuit, results chan<- EnrichedData, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for c := range jobs {
-		data := EnrichedData{CircuitID: c.CID}
+		// 1. Notion: Obtenemos OLT y ONT ID
+		olt, ont, _ := wp.notion.GetNetworkInfo(c.CID)
 
-		// 1. Notion
-		vlan, user, pass, err := wp.notion.GetCredentials(c.CID)
+		// 2. Ubersmith: 🆕 Obtenemos VLAN y PPPoE
+		vlan, p_user, p_pass, err := wp.ubersmith.GetServiceDetails(c.CID)
 		if err != nil {
-			data.Error = fmt.Errorf("notion: %w", err)
-			results <- data
-			continue
-		}
-		data.VLAN = vlan
-		data.PPPoEUser = user
-		data.PPPoEPass = pass
-
-		// 2. Zabbix
-		status, rx, err := wp.zabbix.GetOpticalInfo(c.OLT_Hostname, c.PonPort, c.OnuIndex)
-
-		if err != nil {
-			data.Error = fmt.Errorf("zabbix err en %s/%s: %v", c.PonPort, c.OnuIndex, err)
-			results <- data
-			continue
+			// Log error pero continuar para al menos traer datos de Zabbix
 		}
 
-		data.StatusGpon = status
-		data.RxPower = rx
-		results <- data
+		// 3. Zabbix: Potencia y Estado
+		status, rx, _ := wp.zabbix.GetOpticalInfo(olt, ont)
+
+		// Enviamos todo enriquecido
+		results <- EnrichedData{
+			CircuitID:     c.CID,
+			VLAN:          vlan,
+			PPPoEUsername: p_user,
+			PPPoEPassword: p_pass,
+			StatusGpon:    status,
+			RxPower:       rx,
+		}
 	}
 }

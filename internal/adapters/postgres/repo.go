@@ -26,8 +26,8 @@ func NewPostgresRepo(connStr string) (*PostgresRepo, error) {
 
 // FetchPendingCircuits: Obtiene los circuitos pendientes de sincronización
 func (r *PostgresRepo) FetchPendingCircuits() ([]core.Circuit, error) {
-	// 🚧 NECESITO INFO: Nombre real de la tabla y columnas
-	query := `SELECT id, circuit_code, olt_host FROM circuits_table WHERE status = 'active'`
+	// 🚧 'circuit_id' es el CID en la DB
+	query := `SELECT circuit_id FROM servicios WHERE StatusGpon IS NULL` // Ejemplo de filtro
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -58,23 +58,14 @@ func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
 		return err
 	}
 
-	// 🚧 NECESITO INFO: Nombres de columnas destino
+	// 🚧 CAMBIO: Columnas exactas RxPower y StatusGpon
 	stmt, err := tx.Prepare(`
-		UPDATE circuits_table
-		SET vlan=$1, pppoe_user=$2, pppoe_pass=$3, gpon_status=$4, rx_power=$5, last_updated=NOW()
-		WHERE circuit_code=$6
-	`)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	defer stmt.Close()
+		UPDATE servicios 
+        SET "RxPower"=$1, "StatusGpon"=$2, "VLAN"=$3, "PPPoEUser"=$4, "PPPoEPass"=$5 
+        WHERE circuit_id=$6`)
 
 	for _, d := range data {
-		if _, err := stmt.Exec(d.VLAN, d.PPPoEUser, d.PPPoEPass, d.StatusGpon, d.RxPower, d.CircuitID); err != nil {
-			tx.Rollback()
-			return err
-		}
+		stmt.Exec(d.RxPower, d.StatusGpon, d.CircuitID)
 	}
 	return tx.Commit()
 }

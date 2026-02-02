@@ -36,16 +36,15 @@ type notionQueryResp struct {
 }
 
 // GetCredentials: Obtiene las credenciales del circuito
-func (n *NotionAdapter) GetCredentials(circuitID string) (string, string, string, error) {
+func (n *NotionAdapter) GetNetworkInfo(circuitID string) (string, string, error) {
 	url := fmt.Sprintf("https://api.notion.com/v1/databases/%s/query", n.databaseID)
 
-	// Filtro JSON para buscar por CircuitID
-	// 🚧 NECESITO INFO: ¿Cómo se llama exactamente la columna 'CircuitID' en Notion?
+	// 🚧 CAMBIO: Usamos 'contains' para buscar el CID dentro del string fx-CID-nombre
 	filterBody := map[string]interface{}{
 		"filter": map[string]interface{}{
-			"property": "Circuit Code", // <--- CAMBIAR ESTO POR EL NOMBRE REAL EN NOTION
+			"property": "Description",
 			"rich_text": map[string]string{
-				"equals": circuitID,
+				"contains": circuitID,
 			},
 		},
 	}
@@ -58,31 +57,29 @@ func (n *NotionAdapter) GetCredentials(circuitID string) (string, string, string
 
 	resp, err := n.client.Do(req)
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "", "", "", fmt.Errorf("notion api error: %d", resp.StatusCode)
+		return "", "", fmt.Errorf("notion api error: %d", resp.StatusCode)
 	}
 
 	var result notionQueryResp
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
 	if len(result.Results) == 0 {
-		return "", "", "", fmt.Errorf("circuit not found in notion")
+		return "", "", fmt.Errorf("circuit not found in notion")
 	}
 
-	// props := result.Results[0].Properties
+	props := result.Results[0].Properties
 
-	// 🚧 NECESITO INFO: Nombres exactos de las propiedades (columnas) en Notion
-	// Notion devuelve estructuras anidadas complejas. Aquí asumo que son texto simple.
-	// Tendrás que ajustar este parseo según tus tipos de datos en Notion.
-	vlan := "" // props["VLAN"].RichText[0].PlainText
-	user := "" // props["PPPoE User"].RichText[0].PlainText
-	pass := "" // props["PPPoE Pass"].RichText[0].PlainText
+	// 🚧 EXTRACCIÓN: Obtenemos OLT y ONT ID (1/2/3) de las columnas de Notion
+	// Nota: Notion devuelve arrays, accedemos al primer elemento de plain_text
+	olt := props["OLT"].RichText[0].PlainText
+	ont := props["ONT ID"].RichText[0].PlainText
 
-	return vlan, user, pass, nil
+	return olt, ont, nil
 }
