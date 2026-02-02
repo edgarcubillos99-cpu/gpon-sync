@@ -1,22 +1,41 @@
 // aqui estamos definiendo las entidades y las interfaces
 package core
 
+import "time"
+
 type Circuit struct {
-	ID           int
-	CircuitID    string // Identificador único (ej. "CIR-100")
-	OLT_Hostname string // Necesario para buscar en Zabbix
-	PonPort      string // Ej: "1" o "2"
-	OnuIndex     string // Ej: "51", "52", "1"
+	ID        int       `json:"id"`
+	CID       string    `json:"cid"`
+	Name      string    `json:"name"`
+	PlanName  string    `json:"plan_name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// Datos de Notion
+	OLT           string `json:"olt"`
+	VLAN          int    `json:"vlan"`
+	PPPoEUsername string `json:"pppoe_username"`
+	PPPoEPassword string `json:"pppoe_password"`
+
+	// Datos de Zabbix (campos de entrada)
+	OLT_Hostname string `json:"olt_hostname"`
+	PonPort      string `json:"pon_port"`
+	OnuIndex     string `json:"onu_index"`
+
+	// Datos de Zabbix (resultados)
+	StatusGpon string  `json:"status_gpon"`
+	RxPower    float64 `json:"rx_power"`
 }
 
+// EnrichedData representa los datos enriquecidos de un circuito después del procesamiento
 type EnrichedData struct {
-	CircuitID  string
-	VLAN       string
-	PPPoEUser  string
-	PPPoEPass  string
-	StatusGpon string
-	RxPower    string
-	Error      error
+	CircuitID  string `json:"circuit_id"`
+	VLAN       string `json:"vlan"`
+	PPPoEUser  string `json:"pppoe_user"`
+	PPPoEPass  string `json:"pppoe_pass"`
+	StatusGpon string `json:"status_gpon"`
+	RxPower    string `json:"rx_power"`
+	Error      error  `json:"-"`
 }
 
 // Interfaces (Ports)

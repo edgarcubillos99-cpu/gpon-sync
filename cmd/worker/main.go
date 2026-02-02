@@ -59,7 +59,11 @@ func main() {
 
 	// Guardar remanentes
 	if len(batch) > 0 {
-		dbRepo.UpdateCircuitBatch(batch)
+		if err := dbRepo.UpdateCircuitBatch(batch); err != nil {
+			log.Printf("[CRITICAL] Fallo al guardar batch final: %v", err)
+		} else {
+			log.Printf("Batch final guardado (%d items)", len(batch))
+		}
 	}
 
 	log.Println("Trabajo finalizado.")

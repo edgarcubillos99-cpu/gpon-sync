@@ -47,10 +47,10 @@ func (wp *WorkerPool) Run(circuits []Circuit) <-chan EnrichedData {
 func (wp *WorkerPool) worker(id int, jobs <-chan Circuit, results chan<- EnrichedData, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for c := range jobs {
-		data := EnrichedData{CircuitID: c.CircuitID}
+		data := EnrichedData{CircuitID: c.CID}
 
 		// 1. Notion
-		vlan, user, pass, err := wp.notion.GetCredentials(c.CircuitID)
+		vlan, user, pass, err := wp.notion.GetCredentials(c.CID)
 		if err != nil {
 			data.Error = fmt.Errorf("notion: %w", err)
 			results <- data

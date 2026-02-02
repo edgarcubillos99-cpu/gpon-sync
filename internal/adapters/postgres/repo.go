@@ -38,7 +38,7 @@ func (r *PostgresRepo) FetchPendingCircuits() ([]core.Circuit, error) {
 	var circuits []core.Circuit
 	for rows.Next() {
 		var c core.Circuit
-		if err := rows.Scan(&c.ID, &c.CircuitID, &c.OLT_Hostname); err != nil {
+		if err := rows.Scan(&c.ID, &c.CID, &c.OLT_Hostname); err != nil {
 			return nil, err
 		}
 		circuits = append(circuits, c)
@@ -48,6 +48,10 @@ func (r *PostgresRepo) FetchPendingCircuits() ([]core.Circuit, error) {
 
 // UpdateCircuitBatch: Actualiza un batch de circuitos en la base de datos
 func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
+	if len(data) == 0 {
+		return nil
+	}
+
 	// Implementación básica. Para producción masiva, usar COPY o transacciones por bloques.
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -61,6 +65,7 @@ func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
 		WHERE circuit_code=$6
 	`)
 	if err != nil {
+		tx.Rollback()
 		return err
 	}
 	defer stmt.Close()
