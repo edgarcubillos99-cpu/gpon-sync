@@ -163,7 +163,6 @@ func (z *ZabbixAdapter) GetOpticalInfo(oltHost, ontID string) (string, string, e
 			for _, item := range allItems {
 				if item.Key == powerKey {
 					rx = item.LastValue
-					fmt.Printf("[DEBUG Zabbix] ✅ Encontrada key de RxPower: '%s' = '%s'\n", item.Key, item.LastValue)
 					// Solo agregar " dBm" si hay un valor y no es "0"
 					if rx != "" && rx != "0" {
 						rx = rx + " dBm"
@@ -197,7 +196,6 @@ func (z *ZabbixAdapter) GetOpticalInfo(oltHost, ontID string) (string, string, e
 														// Los valores vienen en centésimas (ej: -158 = -15.8 dBm)
 														// Dividimos por 10 para obtener el valor real
 														rx = fmt.Sprintf("%.1f", valFloat/10.0)
-														fmt.Printf("[DEBUG Zabbix] ✅ Encontrado RxPower en JSON: interface='%s' = '%s' dBm\n", ontPattern, rx)
 														rx = rx + " dBm"
 														break
 													}
@@ -217,11 +215,7 @@ func (z *ZabbixAdapter) GetOpticalInfo(oltHost, ontID string) (string, string, e
 					}
 				}
 			}
-		} else {
-			fmt.Printf("[DEBUG Zabbix] Error parseando respuesta de RxPower: %v\n", err)
 		}
-	} else {
-		fmt.Printf("[DEBUG Zabbix] Error en consulta de RxPower: %v\n", err)
 	}
 
 	return status, rx, nil

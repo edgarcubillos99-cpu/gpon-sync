@@ -87,11 +87,6 @@ func (wp *WorkerPool) worker(jobs <-chan Circuit, results chan<- EnrichedData, w
 		} else {
 			enriched.StatusGpon = status
 			enriched.RxPower = rx
-			// Log detallado para debugging de RxPower
-			if rx == "" && status != "" {
-				log.Printf("[DEBUG] CID %s - Zabbix: Status encontrado (%s) pero RxPower vacío (OLT:%s, ONT:%s)",
-					c.CID, status, olt, ont)
-			}
 		}
 
 		// Enviamos datos enriquecidos (pueden tener errores parciales)
