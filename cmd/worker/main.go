@@ -55,20 +55,20 @@ func main() {
 
 	for res := range resultsCh {
 		processedCount++
-		
+
 		// Log detallado para cada instancia (pruebas)
 		log.Printf("\n=== INSTANCIA %d: CID=%s ===", processedCount, res.CircuitID)
-		
+
 		if res.Error != nil {
 			errorCount++
 			log.Printf("[ERROR] CID %s: %v", res.CircuitID, res.Error)
-			log.Printf("[DETALLE] VLAN=%s, PPPoEUser=%s, StatusGpon=%s, RxPower=%s", 
+			log.Printf("[DETALLE] VLAN=%s, PPPoEUser=%s, StatusGpon=%s, RxPower=%s",
 				res.VLAN, res.PPPoEUsername, res.StatusGpon, res.RxPower)
 			// Continuamos para intentar guardar datos parciales si existen
 		} else {
 			successCount++
 			log.Printf("[OK] CID %s procesado exitosamente", res.CircuitID)
-			log.Printf("[DETALLE] VLAN=%s, PPPoEUser=%s, StatusGpon=%s, RxPower=%s", 
+			log.Printf("[DETALLE] VLAN=%s, PPPoEUser=%s, StatusGpon=%s, RxPower=%s",
 				res.VLAN, res.PPPoEUsername, res.StatusGpon, res.RxPower)
 		}
 
@@ -79,7 +79,7 @@ func main() {
 				log.Printf("[DRY-RUN] Se actualizaría batch de %d items (NO se guardó)", len(batch))
 				// Mostrar qué se actualizaría
 				for _, item := range batch {
-					log.Printf("[DRY-RUN]   CID=%s → RxPower=%s, StatusGpon=%s, VLAN=%s, PPPoEUser=%s", 
+					log.Printf("[DRY-RUN]   CID=%s → RxPower=%s, StatusGpon=%s, VLAN=%s, PPPoEUser=%s",
 						item.CircuitID, item.RxPower, item.StatusGpon, item.VLAN, item.PPPoEUsername)
 				}
 			} else {
@@ -99,7 +99,7 @@ func main() {
 			log.Printf("[DRY-RUN] Se actualizaría batch final de %d items (NO se guardó)", len(batch))
 			// Mostrar qué se actualizaría
 			for _, item := range batch {
-				log.Printf("[DRY-RUN]   CID=%s → RxPower=%s, StatusGpon=%s, VLAN=%s, PPPoEUser=%s", 
+				log.Printf("[DRY-RUN]   CID=%s → RxPower=%s, StatusGpon=%s, VLAN=%s, PPPoEUser=%s",
 					item.CircuitID, item.RxPower, item.StatusGpon, item.VLAN, item.PPPoEUsername)
 			}
 		} else {

@@ -45,24 +45,11 @@ type notionQueryResp struct {
 	} `json:"results"`
 }
 
-// GetCredentials: Obtiene las credenciales del circuito
-func (n *NotionAdapter) GetNetworkInfo(circuitID string) (string, string, error) {
+// queryNotion busca en Notion usando un filtro específico
+func (n *NotionAdapter) queryNotion(filter map[string]interface{}) (*notionQueryResp, error) {
 	url := fmt.Sprintf("https://api.notion.com/v1/databases/%s/query", n.databaseID)
-
-	// Buscamos el CID dentro del formato fx-CID-nombre en Description
-	// Description puede ser Title o RichText, intentamos con Title primero
-	// Si falla, intentaremos con RichText como fallback
-	filterBody := map[string]interface{}{
-		"filter": map[string]interface{}{
-			"property": "Description",
-			"title": map[string]string{
-				"contains": circuitID,
-			},
-		},
-	}
 	
-	// Primera intento con Title
-	jsonData, _ := json.Marshal(filterBody)
+	jsonData, _ := json.Marshal(filter)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	req.Header.Set("Authorization", "Bearer "+n.apiKey)
 	req.Header.Set("Notion-Version", "2022-06-28")
@@ -70,51 +57,106 @@ func (n *NotionAdapter) GetNetworkInfo(circuitID string) (string, string, error)
 
 	resp, err := n.client.Do(req)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "", "", fmt.Errorf("notion api error: %d", resp.StatusCode)
+		return nil, fmt.Errorf("notion api error: %d", resp.StatusCode)
 	}
 
 	var result notionQueryResp
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", "", err
+		return nil, err
 	}
 
-	// Si no encontramos resultados con Title, intentamos con RichText
-	if len(result.Results) == 0 {
-		filterBodyRichText := map[string]interface{}{
+	return &result, nil
+}
+
+// GetCredentials: Obtiene las credenciales del circuito
+func (n *NotionAdapter) GetNetworkInfo(circuitID string) (string, string, error) {
+	// ESTRATEGIA DE BÚSQUEDA EN DOS PASOS:
+	// 1. Primero intentamos buscar con el formato específico fx-CID-nombre
+	// 2. Si no encontramos, buscamos cualquier campo que contenga el número CID
+
+	// PASO 1: Buscar con formato fx-CID-nombre (o fxCID)
+	formats := []string{
+		fmt.Sprintf("fx-%s-", circuitID),  // fx-CID-nombre
+		fmt.Sprintf("fx%s", circuitID),   // fxCID
+		fmt.Sprintf("fx-%s", circuitID),  // fx-CID
+	}
+
+	var result *notionQueryResp
+	var err error
+
+	// Intentamos cada formato con Title primero
+	for _, format := range formats {
+		filterBody := map[string]interface{}{
 			"filter": map[string]interface{}{
 				"property": "Description",
-				"rich_text": map[string]string{
+				"title": map[string]string{
+					"contains": format,
+				},
+			},
+		}
+		
+		result, err = n.queryNotion(filterBody)
+		if err == nil && result != nil && len(result.Results) > 0 {
+			break
+		}
+
+		// Si no encontramos con Title, intentamos con RichText
+		if err == nil && (result == nil || len(result.Results) == 0) {
+			filterBodyRichText := map[string]interface{}{
+				"filter": map[string]interface{}{
+					"property": "Description",
+					"rich_text": map[string]string{
+						"contains": format,
+					},
+				},
+			}
+			result, err = n.queryNotion(filterBodyRichText)
+			if err == nil && result != nil && len(result.Results) > 0 {
+				break
+			}
+		}
+	}
+
+	// PASO 2: Si no encontramos con formato específico, buscamos solo el número CID
+	if result == nil || len(result.Results) == 0 {
+		// Buscar solo el número CID en cualquier parte del campo Description
+		filterBody := map[string]interface{}{
+			"filter": map[string]interface{}{
+				"property": "Description",
+				"title": map[string]string{
 					"contains": circuitID,
 				},
 			},
 		}
-		jsonData, _ = json.Marshal(filterBodyRichText)
-		req, _ = http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-		req.Header.Set("Authorization", "Bearer "+n.apiKey)
-		req.Header.Set("Notion-Version", "2022-06-28")
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err = n.client.Do(req)
+		
+		result, err = n.queryNotion(filterBody)
 		if err != nil {
 			return "", "", err
 		}
-		defer resp.Body.Close()
 
-		if resp.StatusCode != 200 {
-			return "", "", fmt.Errorf("notion api error: %d", resp.StatusCode)
-		}
-
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			return "", "", err
+		// Si no encontramos con Title, intentamos con RichText
+		if len(result.Results) == 0 {
+			filterBodyRichText := map[string]interface{}{
+				"filter": map[string]interface{}{
+					"property": "Description",
+					"rich_text": map[string]string{
+						"contains": circuitID,
+					},
+				},
+			}
+			result, err = n.queryNotion(filterBodyRichText)
+			if err != nil {
+				return "", "", err
+			}
 		}
 	}
 
-	if len(result.Results) == 0 {
+	if result == nil || len(result.Results) == 0 {
 		return "", "", fmt.Errorf("circuit not found in notion")
 	}
 

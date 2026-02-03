@@ -64,7 +64,7 @@ func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
 	// MySQL usa backticks para nombres de columnas y ? para parámetros
 	stmt, err := tx.Prepare(
 		"UPDATE circuitos " +
-		"SET `RxPower`=?, `StatusGpon`=?, `VLAN`=?, `PPPoEUser`=?, `PPPoEPass`=? " +
+		"SET `RxPower`=?, `StatusGpon`=?, `VLAN`=?, `PPPoEUsername`=?, `PPPoEPassword`=? " +
 		"WHERE `CID`=?")
 	if err != nil {
 		tx.Rollback()
