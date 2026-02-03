@@ -3,18 +3,19 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 	"gpon-sync/internal/core"
 
-	_ "github.com/lib/pq" // Driver Postgres implícito
+	_ "github.com/go-sql-driver/mysql" // Driver MySQL implícito
 )
 
 type PostgresRepo struct {
 	db *sql.DB
 }
 
-// NewPostgresRepo: Crea una nueva instancia de PostgresRepo
+// NewPostgresRepo: Crea una nueva instancia de PostgresRepo (compatible con MySQL)
 func NewPostgresRepo(connStr string) (*PostgresRepo, error) {
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("mysql", connStr)
 	if err != nil {
 		return nil, err
 	}
@@ -24,10 +25,10 @@ func NewPostgresRepo(connStr string) (*PostgresRepo, error) {
 	return &PostgresRepo{db: db}, nil
 }
 
-// FetchPendingCircuits: Obtiene los circuitos pendientes de sincronización
+// FetchPendingCircuits: Obtiene TODOS los circuitos sin discriminar valores vacíos
 func (r *PostgresRepo) FetchPendingCircuits() ([]core.Circuit, error) {
-	// 🚧 'circuit_id' es el CID en la DB
-	query := `SELECT circuit_id FROM servicios WHERE StatusGpon IS NULL` // Ejemplo de filtro
+	// Según requerimiento: obtener TODOS los CID sin filtro
+	query := `SELECT CID FROM circuitos`
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -38,7 +39,8 @@ func (r *PostgresRepo) FetchPendingCircuits() ([]core.Circuit, error) {
 	var circuits []core.Circuit
 	for rows.Next() {
 		var c core.Circuit
-		if err := rows.Scan(&c.ID, &c.CID, &c.OLT_Hostname); err != nil {
+		// Solo escaneamos circuit_id (CID), los demás campos se obtienen después
+		if err := rows.Scan(&c.CID); err != nil {
 			return nil, err
 		}
 		circuits = append(circuits, c)
@@ -58,14 +60,24 @@ func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
 		return err
 	}
 
-	// 🚧 CAMBIO: Columnas exactas RxPower y StatusGpon
-	stmt, err := tx.Prepare(`
-		UPDATE servicios 
-        SET "RxPower"=$1, "StatusGpon"=$2, "VLAN"=$3, "PPPoEUser"=$4, "PPPoEPass"=$5 
-        WHERE circuit_id=$6`)
+	// Actualización de todos los campos según el flujo de trabajo
+	// MySQL usa backticks para nombres de columnas y ? para parámetros
+	stmt, err := tx.Prepare(
+		"UPDATE circuitos " +
+		"SET `RxPower`=?, `StatusGpon`=?, `VLAN`=?, `PPPoEUser`=?, `PPPoEPass`=? " +
+		"WHERE `CID`=?")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
 
 	for _, d := range data {
-		stmt.Exec(d.RxPower, d.StatusGpon, d.CircuitID)
+		_, err := stmt.Exec(d.RxPower, d.StatusGpon, d.VLAN, d.PPPoEUsername, d.PPPoEPassword, d.CircuitID)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("error actualizando circuito %s: %v", d.CircuitID, err)
+		}
 	}
 	return tx.Commit()
 }

@@ -22,7 +22,7 @@ func NewUbersmithAdapter(baseURL, user, pass string) *UbersmithAdapter {
 
 // GetServiceDetails busca VLAN y PPPoE por CID
 func (u *UbersmithAdapter) GetServiceDetails(cid string) (vlan, user, pass string, err error) {
-	// 🚧 IMPORTANTE: 'custom_field_123' debe ser el ID real del campo CID en tu Ubersmith
+	// 🚧 IMPORTANTE: 'custom_field_123' debe ser el ID real del campo CID en Ubersmith
 	method := "uber.service_list"
 	url := fmt.Sprintf("%s?method=%s&custom_field_CID=%s", u.baseURL, method, cid)
 

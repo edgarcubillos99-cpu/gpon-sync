@@ -23,15 +23,25 @@ func NewNotionAdapter(apiKey, databaseID string) *NotionAdapter {
 }
 
 // Estructuras internas para parsear la respuesta compleja de Notion
+type notionProperty struct {
+	Type string `json:"type"`
+	// Para Title (Description)
+	Title []struct {
+		PlainText string `json:"plain_text"`
+	} `json:"title,omitempty"`
+	// Para RichText (</>)
+	RichText []struct {
+		PlainText string `json:"plain_text"`
+	} `json:"rich_text,omitempty"`
+	// Para Select (OLT)
+	Select *struct {
+		Name string `json:"name"`
+	} `json:"select,omitempty"`
+}
+
 type notionQueryResp struct {
 	Results []struct {
-		Properties map[string]struct {
-			RichText []struct {
-				PlainText string `json:"plain_text"`
-			} `json:"rich_text"`
-			// Notion devuelve tipos distintos (Title, RichText, Number).
-			// He asumido RichText para simplificar.
-		} `json:"properties"`
+		Properties map[string]notionProperty `json:"properties"`
 	} `json:"results"`
 }
 
@@ -39,16 +49,19 @@ type notionQueryResp struct {
 func (n *NotionAdapter) GetNetworkInfo(circuitID string) (string, string, error) {
 	url := fmt.Sprintf("https://api.notion.com/v1/databases/%s/query", n.databaseID)
 
-	// 🚧 CAMBIO: Usamos 'contains' para buscar el CID dentro del string fx-CID-nombre
+	// Buscamos el CID dentro del formato fx-CID-nombre en Description
+	// Description puede ser Title o RichText, intentamos con Title primero
+	// Si falla, intentaremos con RichText como fallback
 	filterBody := map[string]interface{}{
 		"filter": map[string]interface{}{
 			"property": "Description",
-			"rich_text": map[string]string{
+			"title": map[string]string{
 				"contains": circuitID,
 			},
 		},
 	}
-
+	
+	// Primera intento con Title
 	jsonData, _ := json.Marshal(filterBody)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	req.Header.Set("Authorization", "Bearer "+n.apiKey)
@@ -70,16 +83,84 @@ func (n *NotionAdapter) GetNetworkInfo(circuitID string) (string, string, error)
 		return "", "", err
 	}
 
+	// Si no encontramos resultados con Title, intentamos con RichText
+	if len(result.Results) == 0 {
+		filterBodyRichText := map[string]interface{}{
+			"filter": map[string]interface{}{
+				"property": "Description",
+				"rich_text": map[string]string{
+					"contains": circuitID,
+				},
+			},
+		}
+		jsonData, _ = json.Marshal(filterBodyRichText)
+		req, _ = http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		req.Header.Set("Authorization", "Bearer "+n.apiKey)
+		req.Header.Set("Notion-Version", "2022-06-28")
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err = n.client.Do(req)
+		if err != nil {
+			return "", "", err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return "", "", fmt.Errorf("notion api error: %d", resp.StatusCode)
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return "", "", err
+		}
+	}
+
 	if len(result.Results) == 0 {
 		return "", "", fmt.Errorf("circuit not found in notion")
 	}
 
 	props := result.Results[0].Properties
 
-	// 🚧 EXTRACCIÓN: Obtenemos OLT y ONT ID (1/2/3) de las columnas de Notion
-	// Nota: Notion devuelve arrays, accedemos al primer elemento de plain_text
-	olt := props["OLT"].RichText[0].PlainText
-	ont := props["ONT ID"].RichText[0].PlainText
+	// EXTRACCIÓN: Obtenemos OLT y ONT ID (1/2/3) de las columnas de Notion
+	// OLT es de tipo "select" según la respuesta real de Notion
+	oltProp, ok := props["OLT"]
+	if !ok {
+		return "", "", fmt.Errorf("propiedad OLT no encontrada en Notion")
+	}
+	
+	var olt string
+	if oltProp.Select != nil && oltProp.Select.Name != "" {
+		// OLT es un campo select
+		olt = oltProp.Select.Name
+	} else if len(oltProp.RichText) > 0 {
+		// Fallback: OLT como RichText
+		olt = oltProp.RichText[0].PlainText
+	} else if len(oltProp.Title) > 0 {
+		// Fallback: OLT como Title
+		olt = oltProp.Title[0].PlainText
+	} else {
+		return "", "", fmt.Errorf("propiedad OLT vacía en Notion")
+	}
+	
+	// La columna </> tiene nombre vacío "" (no "</>") según la respuesta real
+	ontProp, ok := props[""]
+	if !ok {
+		// Intentamos también con "</>" por si acaso
+		ontProp, ok = props["</>"]
+		if !ok {
+			return "", "", fmt.Errorf("propiedad </> (ONT ID) no encontrada en Notion")
+		}
+	}
+	
+	// </> es de tipo rich_text según la respuesta real
+	var ont string
+	if len(ontProp.RichText) > 0 {
+		ont = ontProp.RichText[0].PlainText
+	} else if len(ontProp.Title) > 0 {
+		// Fallback: </> como Title
+		ont = ontProp.Title[0].PlainText
+	} else {
+		return "", "", fmt.Errorf("propiedad </> (ONT ID) vacía en Notion")
+	}
 
 	return olt, ont, nil
 }

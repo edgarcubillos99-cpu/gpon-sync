@@ -30,6 +30,9 @@ type Config struct {
 
 	// Configuración del Worker
 	WorkerCount int
+
+	// Modo de Prueba (Dry-Run): Si es true, no actualiza la base de datos
+	DryRun bool
 }
 
 // Load lee el archivo .env y las variables de entorno del sistema
@@ -38,19 +41,21 @@ func Load() *Config {
 	// Si no existe (producción con Docker envs), no pasa nada.
 	_ = godotenv.Load()
 
-	// 2. Construcción del DSN de Postgres
+	// 2. Construcción del DSN de MySQL
 	// Es mejor pedir host, user, pass por separado para evitar errores de formato en el string
 	dbHost := getEnvRequired("DB_HOST")
-	dbPort := getEnv("DB_PORT", "5432")
+	dbPort := getEnv("DB_PORT", "3306") // Puerto por defecto de MySQL
 	dbUser := getEnvRequired("DB_USER")
 	dbPass := getEnvRequired("DB_PASS")
 	dbName := getEnvRequired("DB_NAME")
-	dbSSL := getEnv("DB_SSLMODE", "disable") // disable para local, require para prod
 
-	// Formato: postgres://user:password@host:port/dbname?sslmode=disable
+	// Parámetros adicionales de MySQL (parseTime=true para manejar fechas correctamente)
+	dbParams := getEnv("DB_PARAMS", "parseTime=true&charset=utf8mb4")
+
+	// Formato MySQL: user:password@tcp(host:port)/dbname?params
 	databaseURL := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		dbUser, dbPass, dbHost, dbPort, dbName, dbSSL,
+		"%s:%s@tcp(%s:%s)/%s?%s",
+		dbUser, dbPass, dbHost, dbPort, dbName, dbParams,
 	)
 
 	// 3. Configuración de Workers
@@ -61,7 +66,14 @@ func Load() *Config {
 		log.Printf("Advertencia: WORKER_COUNT inválido, usando default: %d", workers)
 	}
 
-	// 4. Retornar Configuración Validada
+	// 4. Modo Dry-Run (Prueba sin modificar DB)
+	dryRunStr := getEnv("DRY_RUN", "false")
+	dryRun := dryRunStr == "true" || dryRunStr == "1" || dryRunStr == "yes"
+	if dryRun {
+		log.Println("⚠️  MODO PRUEBA ACTIVADO (DRY_RUN=true) - NO se actualizará la base de datos")
+	}
+
+	// 5. Retornar Configuración Validada
 	return &Config{
 		DatabaseURL:   databaseURL,
 		NotionKey:     getEnvRequired("NOTION_API_KEY"),
@@ -73,6 +85,7 @@ func Load() *Config {
 		UbersmithUser: getEnvRequired("UBERSMITH_USER"),
 		UbersmithPass: getEnvRequired("UBERSMITH_PASS"),
 		WorkerCount:   workers,
+		DryRun:        dryRun,
 	}
 }
 
