@@ -1,5 +1,5 @@
 # --- Stage 1: Builder ---
-    FROM golang:1.21-alpine AS builder
+    FROM golang:1.23-alpine AS builder
 
     # Instalar git y certificados SSL (necesarios para llamadas HTTPS a Notion/Zabbix)
     RUN apk add --no-cache git ca-certificates

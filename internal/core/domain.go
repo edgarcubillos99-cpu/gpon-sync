@@ -37,6 +37,6 @@ type ZabbixClient interface {
 }
 
 type UbersmithClient interface {
-	// Obtiene los detalles del servicio: VLAN y credenciales PPPoE
-	GetServiceDetails(cid string) (vlan, user, pass string, err error)
+	// Obtiene los detalles del servicio: credenciales PPPoE
+	GetServiceDetails(cid string) (user, pass string, err error)
 }

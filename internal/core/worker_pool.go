@@ -63,13 +63,12 @@ func (wp *WorkerPool) worker(jobs <-chan Circuit, results chan<- EnrichedData, w
 			continue
 		}
 
-		// 2. Ubersmith: Obtenemos VLAN, PPPoEUsername y PPPoEPassword usando CID
-		vlan, p_user, p_pass, err := wp.ubersmith.GetServiceDetails(c.CID)
+		// 2. Ubersmith: Obtenemos PPPoEUsername y PPPoEPassword usando CID
+		p_user, p_pass, err := wp.ubersmith.GetServiceDetails(c.CID)
 		if err != nil {
 			log.Printf("[WARN] CID %s - Ubersmith: %v (continuando...)", c.CID, err)
 			// Continuamos aunque falle Ubersmith para obtener al menos datos de Zabbix
 		} else {
-			enriched.VLAN = vlan
 			enriched.PPPoEUsername = p_user
 			enriched.PPPoEPassword = p_pass
 		}

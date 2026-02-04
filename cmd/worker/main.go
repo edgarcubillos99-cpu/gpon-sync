@@ -38,7 +38,7 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	// 5. Configurar ticker para ejecución cada 10 minutos
-	ticker := time.NewTicker(10 * time.Minute)
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
 	// Contexto para controlar la ejecución
@@ -93,13 +93,13 @@ func main() {
 			if res.Error != nil {
 				errorCount++
 				log.Printf("[ERROR] CID %s: %v", res.CircuitID, res.Error)
-				log.Printf("[DETALLE] VLAN=%s, PPPoEUser=%s, StatusGpon=%s, RxPower=%s",
-					res.VLAN, res.PPPoEUsername, res.StatusGpon, res.RxPower)
+				log.Printf("[DETALLE] PPPoEUser=%s, StatusGpon=%s, RxPower=%s",
+					res.PPPoEUsername, res.StatusGpon, res.RxPower)
 			} else {
 				successCount++
 				log.Printf("[OK] CID %s procesado exitosamente", res.CircuitID)
-				log.Printf("[DETALLE] VLAN=%s, PPPoEUser=%s, StatusGpon=%s, RxPower=%s",
-					res.VLAN, res.PPPoEUsername, res.StatusGpon, res.RxPower)
+				log.Printf("[DETALLE] PPPoEUser=%s, StatusGpon=%s, RxPower=%s",
+					res.PPPoEUsername, res.StatusGpon, res.RxPower)
 			}
 
 			batch = append(batch, res)
@@ -108,8 +108,8 @@ func main() {
 				if cfg.DryRun {
 					log.Printf("[DRY-RUN] Se actualizaría batch de %d items (NO se guardó)", len(batch))
 					for _, item := range batch {
-						log.Printf("[DRY-RUN]   CID=%s → RxPower=%s, StatusGpon=%s, VLAN=%s, PPPoEUser=%s",
-							item.CircuitID, item.RxPower, item.StatusGpon, item.VLAN, item.PPPoEUsername)
+						log.Printf("[DRY-RUN]   CID=%s → RxPower=%s, StatusGpon=%s, PPPoEUser=%s",
+							item.CircuitID, item.RxPower, item.StatusGpon, item.PPPoEUsername)
 					}
 				} else {
 					if err := dbRepo.UpdateCircuitBatch(batch); err != nil {
@@ -127,8 +127,8 @@ func main() {
 			if cfg.DryRun {
 				log.Printf("[DRY-RUN] Se actualizaría batch final de %d items (NO se guardó)", len(batch))
 				for _, item := range batch {
-					log.Printf("[DRY-RUN]   CID=%s → RxPower=%s, StatusGpon=%s, VLAN=%s, PPPoEUser=%s",
-						item.CircuitID, item.RxPower, item.StatusGpon, item.VLAN, item.PPPoEUsername)
+					log.Printf("[DRY-RUN]   CID=%s → RxPower=%s, StatusGpon=%s, PPPoEUser=%s",
+						item.CircuitID, item.RxPower, item.StatusGpon, item.PPPoEUsername)
 				}
 			} else {
 				if err := dbRepo.UpdateCircuitBatch(batch); err != nil {

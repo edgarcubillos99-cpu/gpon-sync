@@ -62,9 +62,10 @@ func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
 
 	// Actualización de todos los campos según el flujo de trabajo
 	// MySQL usa backticks para nombres de columnas y ? para parámetros
+	// Nota: VLAN se ignora, no se actualiza
 	stmt, err := tx.Prepare(
 		"UPDATE circuitos " +
-		"SET `RxPower`=?, `StatusGpon`=?, `VLAN`=?, `PPPoEUsername`=?, `PPPoEPassword`=? " +
+		"SET `RxPower`=?, `StatusGpon`=?, `PPPoEUsername`=?, `PPPoEPassword`=? " +
 		"WHERE `CID`=?")
 	if err != nil {
 		tx.Rollback()
@@ -73,7 +74,7 @@ func (r *PostgresRepo) UpdateCircuitBatch(data []core.EnrichedData) error {
 	defer stmt.Close()
 
 	for _, d := range data {
-		_, err := stmt.Exec(d.RxPower, d.StatusGpon, d.VLAN, d.PPPoEUsername, d.PPPoEPassword, d.CircuitID)
+		_, err := stmt.Exec(d.RxPower, d.StatusGpon, d.PPPoEUsername, d.PPPoEPassword, d.CircuitID)
 		if err != nil {
 			tx.Rollback()
 			return fmt.Errorf("error actualizando circuito %s: %v", d.CircuitID, err)
