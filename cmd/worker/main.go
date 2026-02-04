@@ -144,7 +144,7 @@ func main() {
 		log.Printf("Exitosos: %d", successCount)
 		log.Printf("Con errores: %d", errorCount)
 		log.Println("✅ Proceso completado")
-		log.Printf("⏰ Próxima ejecución en 10 minutos...\n")
+		log.Printf("⏰ Esperando próxima ejecución\n")
 	}
 
 	// Ejecutar inmediatamente al inicio
